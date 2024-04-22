@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { RegisterDto } from './dto/register.dto';
 import { RedisService } from '../redis/redis.service';
 import { md5 } from '../utils/md5';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class UserService {
@@ -16,6 +17,9 @@ export class UserService {
   //注入redis
   @Inject(RedisService)
   private redisService: RedisService;
+  //注入nodemailer
+  @Inject(EmailService)
+  private emailService: EmailService;
   async register(register: RegisterDto) {
     //注册流程
     //先从redis中判断验证码
@@ -25,7 +29,7 @@ export class UserService {
       throw new HttpException('验证码已过期', HttpStatus.BAD_REQUEST);
     }
     //验证码不正确
-    if (register.captcha !== captcha) {
+    if (register.captcha !== captcha[0]) {
       throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
     }
     //如果验证码，进入mysql查询用户
@@ -46,15 +50,32 @@ export class UserService {
       await this.useRepository.save(newUser);
       return {
         status: HttpStatus.OK,
-        message: 'success register',
+        message: '注册成功',
       };
     } catch (e) {
       this.logger.error(e, UserService);
       return '注册错误';
     }
   }
-
-  findAll() {
-    return `This action returns all user`;
+  async captcha(address: string) {
+    const code = Math.random().toString().slice(2, 8); //随机验证码
+    await this.redisService.set(`captcha_${address}`, code, 5 * 60); //将验证码存入redis
+    try {
+      await this.emailService.sendMail({
+        to: address,
+        subject: '注册验证码',
+        html: `<p>你的验证码是 ${code}</p>`,
+      });
+      return {
+        message: '发送成功',
+        code: HttpStatus.OK,
+      };
+    } catch (e) {
+      return {
+        message: '错误',
+        code: HttpStatus.BAD_REQUEST,
+        data: e,
+      };
+    }
   }
 }

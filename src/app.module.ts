@@ -7,6 +7,7 @@ import { User } from './user/entities/user';
 import { Role } from './user/entities/role';
 import { Permission } from './user/entities/permission';
 import { RedisModule } from './redis/redis.module';
+import { EmailModule } from './email/email.module';
 @Module({
   imports: [
     //引入typeorm
@@ -28,6 +29,7 @@ import { RedisModule } from './redis/redis.module';
     }),
     UserModule,
     RedisModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

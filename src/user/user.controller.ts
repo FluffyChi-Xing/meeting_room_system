@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterDto } from './dto/register.dto';
 
@@ -11,8 +11,8 @@ export class UserController {
   async create(@Body() registerDto: RegisterDto) {
     return await this.userService.register(registerDto);
   }
-  @Get()
-  hello() {
-    return this.userService.findAll();
+  @Get('captcha')
+  async captcha(@Query('address') address: string) {
+    return this.userService.captcha(address);
   }
 }

@@ -13,10 +13,14 @@ import { createClient } from 'redis';
             host: 'localhost',
             port: 6379,
           },
-          database: 1,
         });
-        await client.connect();
-        return client;
+        try {
+          await client.connect();
+          console.log('连接成功');
+          return client;
+        } catch (e) {
+          console.log('连接失败', e);
+        }
       },
     },
   ],
