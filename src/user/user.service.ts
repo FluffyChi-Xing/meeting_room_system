@@ -7,6 +7,13 @@ import { RegisterDto } from './dto/register.dto';
 import { RedisService } from '../redis/redis.service';
 import { md5 } from '../utils/md5';
 import { EmailService } from '../email/email.service';
+import { Role } from './entities/role';
+import { Permission } from './entities/permission';
+import { LoginUserDto } from './dto/loginUser.dto';
+import { LoginUserVo } from './vo/login-user.vo';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { RefreshDto } from './dto/refresh.dto';
 
 @Injectable()
 export class UserService {
@@ -14,12 +21,24 @@ export class UserService {
   //注入 Repository<User>
   @InjectRepository(User)
   private useRepository: Repository<User>;
+  //注入 Repository<Role>
+  @InjectRepository(Role)
+  private roleRepository: Repository<Role>;
+  //注入 Repository<Permission>
+  @InjectRepository(Permission)
+  private perRepository: Repository<Permission>;
   //注入redis
   @Inject(RedisService)
   private redisService: RedisService;
   //注入nodemailer
   @Inject(EmailService)
   private emailService: EmailService;
+  //注入jwtService
+  @Inject(JwtService)
+  private jwtService: JwtService;
+  //注入 configService
+  @Inject(ConfigService)
+  private configService: ConfigService;
   async register(register: RegisterDto) {
     //注册流程
     //先从redis中判断验证码
@@ -29,7 +48,7 @@ export class UserService {
       throw new HttpException('验证码已过期', HttpStatus.BAD_REQUEST);
     }
     //验证码不正确
-    if (register.captcha !== captcha[0]) {
+    if (register.captcha !== captcha) {
       throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
     }
     //如果验证码，进入mysql查询用户
@@ -64,7 +83,7 @@ export class UserService {
       await this.emailService.sendMail({
         to: address,
         subject: '注册验证码',
-        html: `<p>你的验证码是 ${code}</p>`,
+        html: `<p>你的验证码是 ${code}</p><p>验证码的有效期是五分钟</p>`,
       });
       return {
         message: '发送成功',
@@ -74,6 +93,204 @@ export class UserService {
       return {
         message: '错误',
         code: HttpStatus.BAD_REQUEST,
+        data: e,
+      };
+    }
+  }
+  //数据库初始化批处理
+  /*
+  async initData() {
+    const user1 = new User();
+    user1.username = 'zhangsan';
+    user1.password = md5('111111');
+    user1.email = 'xxx@xx.com';
+    user1.isAdmin = true;
+    user1.nickName = '张三';
+    user1.phoneNumber = '13233323333';
+
+    const user2 = new User();
+    user2.username = 'lisi';
+    user2.password = md5('222222');
+    user2.email = 'yy@yy.com';
+    user2.nickName = '李四';
+
+    const role1 = new Role();
+    role1.name = '管理员';
+
+    const role2 = new Role();
+    role2.name = '普通用户';
+
+    const permission1 = new Permission();
+    permission1.code = 'ccc';
+    permission1.description = '访问 ccc 接口';
+
+    const permission2 = new Permission();
+    permission2.code = 'ddd';
+    permission2.description = '访问 ddd 接口';
+
+    user1.roles = [role1];
+    user2.roles = [role2];
+
+    role1.permissions = [permission1, permission2];
+    role2.permissions = [permission1];
+
+    await this.perRepository.save([permission1, permission2]);
+    await this.roleRepository.save([role1, role2]);
+    await this.useRepository.save([user1, user2]);
+  }
+   */
+  //登录接口
+  async userLogin(loginUser: LoginUserDto) {
+    let isAdmin: boolean;
+    try {
+      if (loginUser.isAdmin === 'true') {
+        isAdmin = true;
+      }
+      if (loginUser.isAdmin === 'false') {
+        isAdmin = false;
+      }
+      const user = await this.useRepository.findOne({
+        where: {
+          username: loginUser.username,
+          isAdmin: isAdmin,
+        },
+        relations: ['roles', 'roles.permissions'],
+      });
+      if (!user) {
+        return {
+          code: HttpStatus.BAD_REQUEST,
+          message: '用户不存在',
+        };
+      }
+      if (user.password !== md5(loginUser.password)) {
+        return {
+          code: HttpStatus.BAD_REQUEST,
+          message: '密码错误',
+        };
+      }
+      const vo = new LoginUserVo();
+      vo.userInfo = {
+        id: user.id,
+        username: user.username,
+        nickName: user.nickName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        headPic: user.headPic,
+        createTime: user.createTime.getTime(),
+        isFrozen: user.isFrozen,
+        isAdmin: user.isAdmin,
+        roles: user.roles.map((item) => item.name),
+        permissions: user.roles.reduce((arr, item) => {
+          item.permissions.forEach((permission) => {
+            if (arr.indexOf(permission) === -1) {
+              arr.push(permission);
+            }
+          });
+          return arr;
+        }, []),
+      };
+      vo.accessToken = this.jwtService.sign(
+        {
+          userId: vo.userInfo.id,
+          username: vo.userInfo.username,
+          roles: vo.userInfo.roles,
+          permissions: vo.userInfo.permissions,
+        },
+        {
+          expiresIn:
+            this.configService.get('jwt_access_token_expires_time') || '30m',
+        },
+      );
+
+      vo.refreshToken = this.jwtService.sign(
+        {
+          userId: vo.userInfo.id,
+        },
+        {
+          expiresIn:
+            this.configService.get('jwt_refresh_token_expres_time') || '7d',
+        },
+      );
+      return vo;
+    } catch (e) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        data: e,
+        message: '登录失败',
+      };
+    }
+  }
+  async findUserById(userId: number, isAdmin: boolean) {
+    const user = await this.useRepository.findOne({
+      where: {
+        id: userId,
+        isAdmin,
+      },
+      relations: ['roles', 'roles.permissions'],
+    });
+
+    return {
+      id: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin,
+      roles: user.roles.map((item) => item.name),
+      permissions: user.roles.reduce((arr, item) => {
+        item.permissions.forEach((permission) => {
+          if (arr.indexOf(permission) === -1) {
+            arr.push(permission);
+          }
+        });
+        return arr;
+      }, []),
+    };
+  }
+  async refresh(refresh: RefreshDto) {
+    try {
+      const data = this.jwtService.verify(refresh.refreshToken);
+      let sign: boolean;
+      if (refresh.isAdmin === 'true') {
+        sign = true;
+      }
+      if (refresh.isAdmin === 'false') {
+        sign = false;
+      }
+      const user = await this.findUserById(data.userId, sign);
+
+      const access_token = this.jwtService.sign(
+        {
+          userId: user.id,
+          username: user.username,
+          roles: user.roles,
+          permissions: user.permissions,
+        },
+        {
+          expiresIn:
+            this.configService.get('jwt_access_token_expires_time') || '30m',
+        },
+      );
+
+      const refresh_token = this.jwtService.sign(
+        {
+          userId: user.id,
+        },
+        {
+          expiresIn:
+            this.configService.get('jwt_refresh_token_expres_time') || '7d',
+        },
+      );
+
+      return {
+        code: HttpStatus.OK,
+        data: {
+          accessToken: access_token,
+          refreshToken: refresh_token,
+        },
+        message: '刷新成功',
+      };
+    } catch (e) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: 'token 已失效，请重新登录',
         data: e,
       };
     }
