@@ -295,4 +295,17 @@ export class UserService {
       };
     }
   }
+  //用户数据查询服务
+  async getUserInfo(userId: number) {
+    const user = await this.useRepository.findOne({
+      where: { id: userId },
+    });
+    if (!user) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '用户不存在',
+      };
+    }
+    return user;
+  }
 }

@@ -9,7 +9,10 @@ import { Permission } from './user/entities/permission';
 import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from "@nestjs/jwt";
+import { JwtModule } from '@nestjs/jwt';
+import { LoginGuard } from './utils/login.guard';
+import { APP_GUARD } from '@nestjs/core';
+import { PermissionGuard } from './utils/permission.guard';
 @Module({
   imports: [
     //引入typeorm
@@ -58,6 +61,16 @@ import { JwtModule } from "@nestjs/jwt";
     EmailModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: LoginGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionGuard,
+    },
+  ],
 })
 export class AppModule {}
