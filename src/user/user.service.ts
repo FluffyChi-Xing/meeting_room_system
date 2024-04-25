@@ -17,6 +17,7 @@ import { RefreshDto } from './dto/refresh.dto';
 import { UserInfoVo } from './vo/user-info.vo';
 import { UpdatePassDto } from './dto/updatePass.dto';
 import { UpdateInfoDto } from './dto/update-info.dto';
+import { UserListPageDto } from "./dto/userList-page.dto";
 
 @Injectable()
 export class UserService {
@@ -403,6 +404,52 @@ export class UserService {
         code: HttpStatus.BAD_REQUEST,
         message: '操作错误',
         data: e,
+      };
+    }
+  }
+  //查询所有用户
+  async getUserList(page: UserListPageDto) {
+    try {
+      //偏移查询
+      const skipCount = (page.pageNo - 1) * page.pageSize;
+      const [users, totalCount] = await this.useRepository.findAndCount({
+        skip: skipCount,
+        take: page.pageSize,
+      });
+      return {
+        code: HttpStatus.OK,
+        message: '查询成功',
+        data: {
+          list: users,
+          count: totalCount,
+        },
+      };
+    } catch (e) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '查询错误',
+        data: e,
+      };
+    }
+  }
+  //冻结用户权限
+  async frozen(id: number) {
+    const user = await this.useRepository.findOne({
+      where: {
+        id: id,
+      },
+    });
+    user.isFrozen = true;
+    try {
+      await this.useRepository.save(user);
+      return {
+        code: HttpStatus.OK,
+        message: `成功冻结了用户 ${id}`,
+      };
+    } catch (e) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '冻结失败',
       };
     }
   }

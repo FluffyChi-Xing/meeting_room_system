@@ -10,6 +10,7 @@ import {
 } from '../utils/custom.decorator';
 import { UpdatePassDto } from './dto/updatePass.dto';
 import { UpdateInfoDto } from './dto/update-info.dto';
+import { UserListPageDto } from "./dto/userList-page.dto";
 
 @Controller('user')
 export class UserController {
@@ -66,5 +67,29 @@ export class UserController {
     @Body() info: UpdateInfoDto,
   ) {
     return await this.userService.updateInfo(userId, info);
+  }
+  //查询所有用户
+  //需要分页
+  @Get('userList')
+  @RequireLogin() //需要登录
+  async getAllUser(@Body() page: UserListPageDto) {
+    return await this.userService.getUserList(page);
+  }
+  //冻结用户权限
+  //需要登录
+  @Post('frozen')
+  @RequireLogin()
+  async frozenUser(@Body() id: number) {
+    return await this.userService.frozen(id);
+  }
+  //判断是否登录
+  @Get('isLogin')
+  @RequireLogin()
+  async checkToken() {
+    return {
+      code: HttpStatus.OK,
+      message: '用户已登录',
+      sign: true,
+    };
   }
 }
