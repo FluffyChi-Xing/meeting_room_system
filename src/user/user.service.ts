@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
-import { Logger } from 'winston';
+import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user';
 import { Repository } from 'typeorm';
@@ -14,6 +14,9 @@ import { LoginUserVo } from './vo/login-user.vo';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RefreshDto } from './dto/refresh.dto';
+import { UserInfoVo } from './vo/user-info.vo';
+import { UpdatePassDto } from './dto/updatePass.dto';
+import { UpdateInfoDto } from './dto/update-info.dto';
 
 @Injectable()
 export class UserService {
@@ -211,7 +214,11 @@ export class UserService {
             this.configService.get('jwt_refresh_token_expres_time') || '7d',
         },
       );
-      return vo;
+      return {
+        code: HttpStatus.OK,
+        message: '登陆成功',
+        data: vo,
+      };
     } catch (e) {
       return {
         code: HttpStatus.BAD_REQUEST,
@@ -300,12 +307,103 @@ export class UserService {
     const user = await this.useRepository.findOne({
       where: { id: userId },
     });
+    const vo = new UserInfoVo();
+    vo.id = user.id;
+    vo.email = user.email;
+    vo.nickName = user.nickName;
+    vo.username = user.username;
+    vo.headPic = user.headPic;
+    vo.isFroze = user.isFrozen;
+    vo.createDate = user.createTime;
+    vo.phone = user.phoneNumber;
     if (!user) {
       return {
         code: HttpStatus.BAD_REQUEST,
         message: '用户不存在',
       };
     }
-    return user;
+    return {
+      code: HttpStatus.OK,
+      isLogin: true,
+      data: vo,
+    };
+  }
+  //修改密码服务
+  async changePass(userId: number, password: UpdatePassDto) {
+    //由于更新密码需要发送邮件验证码进行验证，因此首先检查redis
+    const captcha = await this.redisService.get(`captcha_${password.email}`);
+    if (!captcha) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '验证码不存在',
+      };
+    }
+    if (password.captcha !== captcha) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '验证码错误',
+      };
+    }
+    //否则修改密码
+    const user = await this.useRepository.findOne({
+      where: {
+        id: userId,
+      },
+    });
+    user.password = md5(password.password);
+    try {
+      await this.useRepository.save(user);
+      return {
+        code: HttpStatus.OK,
+        message: '修改成功',
+      };
+    } catch (e) {
+      this.logger.error(e, UserService);
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '修改错误',
+      };
+    }
+  }
+  //修改用户信息
+  async updateInfo(userId: number, info: UpdateInfoDto) {
+    //更新用户信息先检查redis 的验证码
+    const captcha = await this.redisService.get(`captcha_${info.email}`);
+    if (!captcha) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '验证码不存在',
+      };
+    }
+    if (info.captcha !== captcha) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '验证码错误',
+      };
+    }
+    const user = await this.useRepository.findOne({
+      where: {
+        id: userId,
+      },
+    });
+    user.headPic = info.headPic;
+    user.nickName = info.nickName;
+    user.phoneNumber = info.phoneNumber;
+    user.username = info.username;
+    user.password = md5(info.password);
+    try {
+      await this.useRepository.save(user);
+      return {
+        code: HttpStatus.OK,
+        message: '修改成功',
+      };
+    } catch (e) {
+      this.logger.error(e, UserService);
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '操作错误',
+        data: e,
+      };
+    }
   }
 }
