@@ -10,7 +10,8 @@ import {
 } from '../utils/custom.decorator';
 import { UpdatePassDto } from './dto/updatePass.dto';
 import { UpdateInfoDto } from './dto/update-info.dto';
-import { UserListPageDto } from "./dto/userList-page.dto";
+import { UserListPageDto } from './dto/userList-page.dto';
+import { FuzzySearchDto } from './dto/FuzzySearch.dto';
 
 @Controller('user')
 export class UserController {
@@ -29,7 +30,7 @@ export class UserController {
     const vo = await this.userService.userLogin(userLogin);
     return vo;
   }
-  @Get('refresh')
+  @Post('refresh')
   async refresh(@Body() refreshToken: RefreshDto) {
     return await this.userService.refresh(refreshToken);
   }
@@ -70,7 +71,7 @@ export class UserController {
   }
   //查询所有用户
   //需要分页
-  @Get('userList')
+  @Post('userList')
   @RequireLogin() //需要登录
   async getAllUser(@Body() page: UserListPageDto) {
     return await this.userService.getUserList(page);
@@ -91,5 +92,11 @@ export class UserController {
       message: '用户已登录',
       sign: true,
     };
+  }
+  //根据用户名、昵称或邮箱查询用户
+  @Post('fuzzy')
+  @RequireLogin()
+  async FuzzySearch(@Body() params: FuzzySearchDto) {
+    return await this.userService.fuzzySearch(params);
   }
 }

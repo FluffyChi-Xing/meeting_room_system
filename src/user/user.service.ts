@@ -17,7 +17,8 @@ import { RefreshDto } from './dto/refresh.dto';
 import { UserInfoVo } from './vo/user-info.vo';
 import { UpdatePassDto } from './dto/updatePass.dto';
 import { UpdateInfoDto } from './dto/update-info.dto';
-import { UserListPageDto } from "./dto/userList-page.dto";
+import { UserListPageDto } from './dto/userList-page.dto';
+import { FuzzySearchDto } from './dto/FuzzySearch.dto';
 
 @Injectable()
 export class UserService {
@@ -450,6 +451,104 @@ export class UserService {
       return {
         code: HttpStatus.BAD_REQUEST,
         message: '冻结失败',
+      };
+    }
+  }
+  //模糊/精确查询用户
+  async fuzzySearch(fuzzy: FuzzySearchDto) {
+    if (fuzzy.email || fuzzy.nickName || fuzzy.username) {
+      if (fuzzy.email && fuzzy.username && fuzzy.nickName) {
+        //如果三个参数都不空就精确查询，否则模糊查询
+        try {
+          const user = await this.useRepository.findOne({
+            where: {
+              username: fuzzy.username,
+              nickName: fuzzy.nickName,
+              email: fuzzy.email,
+            },
+          });
+          return {
+            code: HttpStatus.OK,
+            message: '查询成功',
+            data: [user],
+          };
+        } catch (e) {
+          return {
+            code: HttpStatus.BAD_REQUEST,
+            message: '查询失败',
+            data: e,
+          };
+        }
+      } else {
+        //模糊查询
+        if (fuzzy.email) {
+          try {
+            //根据email查询
+            const user = await this.useRepository.find({
+              where: {
+                email: fuzzy.email,
+              },
+            });
+            return {
+              code: HttpStatus.OK,
+              message: '搜索成功',
+              data: user,
+            };
+          } catch (e) {
+            return {
+              code: HttpStatus.BAD_REQUEST,
+              message: '错误查询',
+              data: e,
+            };
+          }
+        }
+        if (fuzzy.nickName) {
+          //根据nickName查询
+          try {
+            const user = await this.useRepository.find({
+              where: {
+                nickName: fuzzy.nickName,
+              },
+            });
+            return {
+              code: HttpStatus.OK,
+              message: '搜索成功',
+              data: user,
+            };
+          } catch (e) {
+            return {
+              code: HttpStatus.BAD_REQUEST,
+              message: '错误',
+              data: e,
+            };
+          }
+        }
+        if (fuzzy.username) {
+          //根据username查询
+          try {
+            const user = await this.useRepository.find({
+              where: {
+                username: fuzzy.username,
+              },
+            });
+            return {
+              code: HttpStatus.OK,
+              message: '搜索成功',
+              data: user,
+            };
+          } catch (e) {
+            return {
+              code: HttpStatus.BAD_REQUEST,
+              message: '错误',
+              data: e,
+            };
+          }
+        }
+      }
+    } else {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '三个参数不能同时为空',
       };
     }
   }
