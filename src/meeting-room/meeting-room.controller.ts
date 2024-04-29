@@ -4,6 +4,7 @@ import { RequireLogin } from '../utils/custom.decorator';
 import { MeetingRoomPageDto } from './dto/meeting-room-page.dto';
 import { CreateMeetingRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
+import { SearchRoomDto } from './dto/search-room.dto';
 
 @Controller('meeting')
 export class MeetingRoomController {
@@ -35,6 +36,18 @@ export class MeetingRoomController {
   @Post('update')
   @RequireLogin()
   async updateRoom(@Body() update: UpdateRoomDto) {
-    await this.meetingRoomService.updateRoom(update);
+    return await this.meetingRoomService.updateRoom(update);
+  }
+  //模糊搜索会议室
+  @Post('search')
+  @RequireLogin()
+  async searchRoom(@Body() room: SearchRoomDto) {
+    return await this.meetingRoomService.searchRoom(room);
+  }
+  //根据四个参数创建会议室
+  @Post('batchRoom')
+  @RequireLogin()
+  async batchRoom(room: SearchRoomDto) {
+    return await this.meetingRoomService.batchRoom(room);
   }
 }
