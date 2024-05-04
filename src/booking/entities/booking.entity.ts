@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { User } from '../../user/entities/user';
 import { MeetingRoom } from '../../meeting-room/entities/meeting-room.entity';
+import { IsNotEmpty } from 'class-validator';
 
 @Entity()
 export class BookingEntity {
@@ -30,7 +31,14 @@ export class BookingEntity {
     default: '申请中',
   })
   status: string;
-
+  @Column({
+    comment: '预定状态',
+    default: 50,
+  })
+  @IsNotEmpty({
+    message: 'sign不可为空',
+  })
+  sign: number;
   @Column({
     length: 100,
     comment: '备注',

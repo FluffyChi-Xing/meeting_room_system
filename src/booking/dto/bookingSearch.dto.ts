@@ -1,6 +1,6 @@
 export class BookingSearchDto {
   username: string;
-  roomName: string;
+  roomID: number;
   bookTime: Date;
-  location: string;
+  status: string;
 }
