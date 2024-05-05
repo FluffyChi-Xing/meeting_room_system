@@ -288,6 +288,7 @@ export class BookingService {
     }
   }
   //催办接口
+  //先去redis里查询半小时内是否有催办记录，如果有则返回错误
   async urgeBooking(id: number) {
     const flag = await this.redisService.get('urge_' + id);
     if (flag) {
