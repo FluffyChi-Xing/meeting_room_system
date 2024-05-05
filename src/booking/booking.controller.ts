@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { BookingService } from './booking.service';
 import { RequireLogin, RequirePermission } from '../utils/custom.decorator';
 import { BookingDto } from './dto/Booking.dto';
@@ -46,5 +46,11 @@ export class BookingController {
   @RequirePermission('ddd')
   async refuseBooking(@Body() id: AccessDto) {
     return await this.bookingService.refuseAccess(id);
+  }
+  //用户催办接口，给管理员发邮件催办，半个小时内只能发一次
+  @Get('urge')
+  @RequireLogin()
+  async urgeBooking(@Query('id') id: number) {
+    return await this.bookingService.urgeBooking(id);
   }
 }

@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { BookingEntity } from './entities/booking.entity';
@@ -8,11 +8,17 @@ import { BookingDto } from './dto/Booking.dto';
 import { BookingSearchDto } from './dto/bookingSearch.dto';
 import { BookRoomDto } from './dto/bookRoom.dto';
 import { AccessDto } from './dto/access.dto';
+import { EmailService } from '../email/email.service';
+import { RedisService } from '../redis/redis.service';
 @Injectable()
 export class BookingService {
   @InjectRepository(BookingEntity)
   private bookEntity: Repository<BookingEntity>;
   private entityManager: EntityManager;
+  @Inject(EmailService)
+  private emailService: EmailService;
+  @Inject(RedisService)
+  private redisService: RedisService;
   //初始化booking列表
   async initData() {
     try {
@@ -280,5 +286,37 @@ export class BookingService {
         data: e,
       };
     }
+  }
+  //催办接口
+  async urgeBooking(id: number) {
+    const flag = await this.redisService.get('urge_' + id);
+    if (flag) {
+      return {
+        code: HttpStatus.BAD_REQUEST,
+        message: '半个小时内只能催办一次',
+      };
+    }
+    let email = await this.redisService.get('admin_email');
+    if (!email) {
+      const admin = await this.entityManager.findOne(User, {
+        select: {
+          email: true,
+        },
+        where: {
+          isAdmin: true,
+        },
+      });
+
+      email = admin.email;
+
+      await this.redisService.set('admin_email', admin.email);
+    }
+    await this.emailService.sendMail({
+      to: email,
+      subject: '预定申请催办提醒',
+      html: `id 为 ${id} 的预定申请正在等待审批`,
+    });
+
+    await this.redisService.set('urge_' + id, 1, 60 * 30);
   }
 }
